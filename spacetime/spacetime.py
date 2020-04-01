@@ -2,32 +2,56 @@ import itertools
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-
+from spacetime.simulate import simulate_random_dag, simulate_ordered_dag, simulate_sem, simulate_data
 
 class SpaceTime:
-    def __init__(self, node_dict, features = list()):
+    def __init__(self, node_dict = dict(), features = list()):
         self.graph = nx.DiGraph(**{'features':features})
         self.order = node_dict
+        self.data = None
         
         for t, time_slice in node_dict.items():
             for node in time_slice:
                 self.add_node(node)
             
         self.time_order_nodes()
-    
-    def add_node(self, node, pos = None, features = list()):
+        
+    def add_node(self, node, latent = False, pos = None, features = list()):
         pos = (np.random.uniform(0,1), np.random.uniform(0,1)) if type(pos) != tuple else pos
-        self.graph.add_node(node, **{'features':features, 'pos':pos})
+        self.graph.add_node(node, **{'latent':latent, 'features':features, 'pos':pos})
     
     def add_edge(self, src, dest, causal = True, features = list()):
-        edge_label = '' if causal else 'X'
-        self.graph.add_edge(src, dest, **{'features':features, 'causal':edge_label})
+        edge_type = '' if causal else 'X'
+        self.graph.add_edge(src, dest, **{'features':features, 'causal':edge_type})
+        
+    def generate_random(self, variable_size, degree, graph_type, seed = 0):
+        self.graph = simulate_random_dag(variable_size, degree, graph_type, seed = seed)
+        self.infer_order()
+        self.label_order_nodes()
+    
+    def generate_ordered(self, degree, graph_type, seed = 0):
+        self.graph = simulate_ordered_dag(self.order, degree, graph_type, seed = seed)
+    
+    def generate_data(self, sample_size, x_dims, sem_type, linear_type, noise_scale = 1.0, seed = 0):
+        self.data = simulate_sem(self.graph, sample_size, x_dims, sem_type, linear_type, 
+                                 noise_scale = noise_scale, seed = seed)
+            
+    def label_order_nodes(self):
+        mapping = dict()
+        inode = 0
+        for t, time_slice in self.order.items():
+            for i, node in enumerate(time_slice):
+                self.order[t][i] = inode
+                mapping.update({node:inode})
+                inode += 1
+        self.graph = nx.relabel_nodes(self.graph, mapping)
         
     def time_order_nodes(self):
         for t, step in self.order.items():
             for x, node in enumerate(step):
-                shift = 0.1 if x%2==0 else 0
-                self.graph.nodes[node]['pos'] = (t+shift, x)
+                shift = np.random.uniform(0,0.2) if x%2==0 else 0
+                shiftt = np.random.uniform(0,0.2) if t%2==0 else 0
+                self.graph.nodes[node]['pos'] = (t+shift, x+shiftt)
     
     def connected_components(self, edges = 'all'):
         assert edges in ['all', 'directed', 'undirected']
@@ -88,16 +112,6 @@ class SpaceTime:
                 seen.append(d)
         return False
     
-    def draw_graph(self):
-        nx.draw_networkx(self.graph, with_labels=True, 
-                         pos=nx.get_node_attributes(self.graph,'pos'),
-                         node_size=800, node_color='gray')
-        nx.draw_networkx_edge_labels(self.graph, 
-                                     pos=nx.get_node_attributes(self.graph,'pos'),
-                                     edge_labels=nx.get_edge_attributes(self.graph,'causal'))
-        plt.axis('off')
-        plt.show()
-        
     def _dfs_util(self, node, adjacencies, visited, temp): 
         visited[node] = True
         temp += [node]
@@ -118,3 +132,16 @@ class SpaceTime:
                 if dest in self.graph[src]:
                     return True
         return False
+    
+    def ordered_adj(self):
+        return np.around(nx.to_numpy_array(self.graph, nodelist=sorted(self.graph._node.keys())), 3)
+    
+    def draw_graph(self):
+        nx.draw_networkx(self.graph, with_labels=True, 
+                         pos=nx.get_node_attributes(self.graph,'pos'),
+                         node_size=800, node_color='gray')
+        nx.draw_networkx_edge_labels(self.graph, 
+                                     pos=nx.get_node_attributes(self.graph,'pos'),
+                                     edge_labels=nx.get_edge_attributes(self.graph,'causal'))
+        plt.axis('off')
+        plt.show()    
