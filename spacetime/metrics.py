@@ -1,3 +1,7 @@
+####################################################################
+### Ripped heavily from https://github.com/fishmoon1234/DAG-GNN
+####################################################################
+
 import math
 import numpy as np
 import networkx as nx

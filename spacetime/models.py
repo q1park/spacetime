@@ -1,3 +1,7 @@
+####################################################################
+### Ripped heavily from https://github.com/fishmoon1234/DAG-GNN
+####################################################################
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

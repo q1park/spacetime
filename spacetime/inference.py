@@ -1,3 +1,7 @@
+####################################################################
+### Ripped heavily from https://github.com/akelleh/causality
+####################################################################
+
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm

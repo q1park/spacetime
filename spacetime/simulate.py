@@ -1,3 +1,7 @@
+####################################################################
+### Ripped heavily from https://github.com/fishmoon1234/DAG-GNN
+####################################################################
+
 import numpy as np
 import networkx as nx
 
@@ -167,16 +171,13 @@ def simulate_data(graph_type, degree, sem_type, linear_type, sample_size, variab
 
 def torch_loader(G, X, batch_size=1000):
     feat_train = torch.FloatTensor(X)
-    feat_valid = torch.FloatTensor(X)
     feat_test = torch.FloatTensor(X)
 
     # reconstruct itself
     train_data = TensorDataset(feat_train, feat_train)
-    valid_data = TensorDataset(feat_valid, feat_valid)
     test_data = TensorDataset(feat_test, feat_test)
 
     train_data_loader = DataLoader(train_data, batch_size=batch_size)
-    valid_data_loader = DataLoader(valid_data, batch_size=batch_size)
-    test_data_loader = DataLoader(test_data, batch_size=batch_size)
+    test_data_loader = DataLoader(test_data, batch_size=len(test_data))
 
-    return train_data_loader, valid_data_loader, test_data_loader
+    return train_data_loader, test_data_loader
