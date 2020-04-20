@@ -6,9 +6,9 @@ import math
 import numpy as np
 import networkx as nx
 
-def count_accuracy(G_true: nx.DiGraph,
-                   G: nx.DiGraph,
-                   G_und: nx.DiGraph = None) -> tuple:
+def count_accuracy(G_true: np.ndarray,
+                   G: np.ndarray,
+                   G_und: np.ndarray = None) -> tuple:
     """Compute FDR, TPR, and FPR for B, or optionally for CPDAG B + B_und.
 
     Args:
@@ -23,9 +23,9 @@ def count_accuracy(G_true: nx.DiGraph,
         shd: undirected extra + undirected missing + reverse
         nnz: prediction positive
     """
-    B_true = nx.to_numpy_array(G_true) != 0
-    B = nx.to_numpy_array(G) != 0
-    B_und = None if G_und is None else nx.to_numpy_array(G_und)
+    B_true = G_true != 0# nx.to_numpy_array(G_true) != 0
+    B = G != 0# nx.to_numpy_array(G) != 0
+    B_und = None if G_und is None else G_und# nx.to_numpy_array(G_und)
     d = B.shape[0]
     # linear index of nonzeros
     if B_und is not None:

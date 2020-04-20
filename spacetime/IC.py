@@ -10,29 +10,24 @@ import itertools
 import networkx as nx
 from collections import Counter
 
-class Infer:
-    def __init__(self, spacetime, data, algorithm, dseparation_test):
+class InductiveCausation:
+    def __init__(self, spacetime, data, dseparation_test):
+        nodes = list(nx.get_node_attributes(spacetime.graph, 'label').values())
+        variables = list(data.columns)
+        if not (all(x in nodes for x in variables) and all(x in variables for x in nodes)):
+            raise InputError("data variables do not match graph nodes")
+            
         self.st = spacetime
-        self.data = data
-        self.algorithm = algorithm
+        self.data = data.rename(columns=dict(map(reversed, self.st.label_dict.items())))
         self.dseparation_test = dseparation_test
         self.sepset = dict()
-        
-        assert len(data.columns) == len(self.st.graph.nodes())
-        for node in self.st.graph.nodes():
-            assert node in data.columns
                 
-    def initialize_graph(self, timing = False):
-        t_past = None
-        for t, step in self.st.order.items():
-            if not timing:                    
-                for (src, dest) in itertools.permutations(step, 2):
-                    self.st.add_edge(src, dest, causal=False)
-
-            if t_past is not None:
-                for (src, dest) in itertools.product(self.st.order[t_past], self.st.order[t]):
-                    self.st.add_edge(src, dest, causal=False)
-            t_past = t
+    def initialize_graph(self):
+        for t, time_slice in self.st.order.items():
+            future = [_x for _t, _xx in self.st.order.items() for _x in _xx if _t>t]
+            
+            for (src, dest) in itertools.product(time_slice, future):
+                self.st.graph.add_edge(src, dest, causal='X')
             
     def d_separate(self, alpha=0.05, max_k=None):
         ### Test for d-separation x - sepset - y
@@ -49,6 +44,7 @@ class Infer:
                 for z in itertools.combinations(z_candidates, N):
                     test = self.dseparation_test([y], [x], list(z), self.data, alpha)
                     if test.independent():
+                        print(x,y,z, test.upper, test.lower)
                         if self.st.graph.has_edge(x,y):
                             self.st.graph.remove_edge(x,y)
                             self.sepset[(x,y)].update(z)
@@ -58,15 +54,15 @@ class Infer:
                         break
                         
         ### Search for collider nodes x > z < y
-        for z in self.st.graph.nodes():
-            for (x,y) in itertools.combinations(set(nx.all_neighbors(self.st.graph, z)), 2):
-                if self.st.graph.has_edge(x,y) or self.st.graph.has_edge(y,x):
-                    continue
-                if z not in self.sepset[tuple(sorted((x,y)))]:
-                    if self.st.graph.has_edge(z,x):
-                        self.st.graph.remove_edge(z,x)
-                    if self.st.graph.has_edge(z,y):
-                        self.st.graph.remove_edge(z,y)
+#         for z in self.st.graph.nodes():
+#             for (x,y) in itertools.combinations(set(nx.all_neighbors(self.st.graph, z)), 2):
+#                 if self.st.graph.has_edge(x,y) or self.st.graph.has_edge(y,x):
+#                     continue
+#                 if z not in self.sepset[tuple(sorted((x,y)))]:
+#                     if self.st.graph.has_edge(z,x):
+#                         self.st.graph.remove_edge(z,x)
+#                     if self.st.graph.has_edge(z,y):\
+#                         self.st.graph.remove_edge(z,y)
                         
     def infer_latent(self):
         added_arrows = True
@@ -76,34 +72,47 @@ class Infer:
             added_arrows_2 = self._recursion_2()
             added_arrows = added_arrows_1 or added_arrows_2
             
-    def model_latent(self):
-        latent_adjs = list()
+#     def model_latent(self):
+#         latent_adjs = list()
 
-        for t, step in self.st.order.copy().items():
-            t_latent = t-1
-            for node in step:
-                for edge in list(self.st.graph.in_edges(node))+list(self.st.graph.out_edges(node)):
-                    adj = tuple(sorted(edge))
-                    causal = True if self.st.graph.get_edge_data(*edge)['causal']=='' else False
+#         for t, step in self.st.order.copy().items():
+#             t_latent = t-1
+#             for node in step:
+#                 for edge in list(self.st.graph.in_edges(node))+list(self.st.graph.out_edges(node)):
+#                     adj = tuple(sorted(edge))
+#                     causal = True if self.st.graph.get_edge_data(*edge)['causal']=='' else False
 
-                    if adj in latent_adjs:
-                        self.st.graph[edge[0]][edge[1]]['causal'] = ''
-                        continue
+#                     if adj in latent_adjs:
+#                         self.st.graph[edge[0]][edge[1]]['causal'] = ''
+#                         continue
 
-                    if not causal:
-                        if t_latent not in self.st.order.keys():
-                            self.st.order[t_latent] = list()
+#                     if not causal:
+#                         if t_latent not in self.st.order.keys():
+#                             self.st.order[t_latent] = list()
 
-                        latent_name = 'L_%s_%s'%(adj[0], adj[1])
-                        self.st.order[t_latent] += [latent_name]
-                        self.st.add_node(latent_name, latent=True)
-                        self.st.add_edge(latent_name, adj[0])
-                        self.st.add_edge(latent_name, adj[1])
-                        self.st.graph[edge[0]][edge[1]]['causal'] = ''
+#                         latent_name = 'L_%s_%s'%(adj[0], adj[1])
+#                         self.st.order[t_latent] += [latent_name]
+#                         self.st.add_node(latent_name)
+#                         self.st.add_edge(latent_name, adj[0])
+#                         self.st.add_edge(latent_name, adj[1])
+#                         self.st.graph[edge[0]][edge[1]]['causal'] = ''
 
-                    latent_adjs += [adj]
-        self.st.time_order_nodes()
-
+#                     latent_adjs += [adj]
+#         self.st.time_order_nodes()
+    
+    def is_causal(self, src, dest):
+        seen = [src]
+        neighbors = [(src,neighbor) for neighbor in self.st.graph.neighbors(src)]
+        
+        while neighbors:
+            (s, d) = neighbors.pop()
+            if d in self.st.graph[s] and self.st.graph[s][d]['causal']=='':
+                if d == dest:
+                    return True
+                if d not in seen:
+                    neighbors += [(d, neighbor) for neighbor in self.st.graph.neighbors(d)]
+                seen.append(d)
+        return False
     
     def _recursion_1(self):
         added_arrows = False
@@ -126,7 +135,7 @@ class Infer:
     def _recursion_2(self):
         added_arrows = False
         for (a,b) in self.st.graph.edges():
-            if self.st.is_causal(b,a):
+            if self.is_causal(b,a):
                 self.st.graph.remove_edge(a,b)
         return added_arrows
 
@@ -153,6 +162,7 @@ class RobustRegressionTest():
                 return False
             else:
                 return True
+
 
 class MutualInformationTest():
     """
