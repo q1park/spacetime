@@ -1,8 +1,5 @@
 import numpy as np
-import torch
-from torch import nn
-from torch.utils.data.dataset import TensorDataset
-from torch.utils.data import DataLoader
+from copy import deepcopy
 
 class arguments:
     def __init__(self, node_dict):
@@ -51,29 +48,12 @@ class arguments:
         self.prior=False
         self.dynamic_graph=False
 
-def nbins(data, bin_width = 0.1):
-    return np.arange(min(data), max(data) + bin_width, bin_width)
-
-def torch_loader(X, batch_size=1000):
-    feat_train = torch.FloatTensor(X)
-    feat_test = torch.FloatTensor(X)
-
-    # reconstruct itself
-    train_data = TensorDataset(feat_train, feat_train)
-    test_data = TensorDataset(feat_test, feat_test)
-
-    train_data_loader = DataLoader(train_data, batch_size=batch_size)
-    test_data_loader = DataLoader(test_data, batch_size=len(test_data))
-
-    return train_data_loader, test_data_loader
-
-def torch_graph(numpy_adj, mutilate = list(), flip = list()):
-    graph = numpy_adj.copy()
+def spacetime_mutilator(spacetime, mutilate=list()):
+    mutilated = deepcopy(spacetime)
     
-    for i, j in mutilate:
-        graph[i, j] = 0
-        
-    for i, j in flip:
-        graph[i, j] *= -1.0
-        
-    return nn.Parameter(torch.from_numpy(graph).double())
+    for edge in list(mutilated.graph.edges()):
+        if edge[1] in mutilate:
+            mutilated.graph.remove_edge(*edge)
+    return mutilated
+
+

@@ -2,11 +2,18 @@ import itertools
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+
+import torch
+from torch import nn
+from torch.utils.data.dataset import TensorDataset
+from torch.utils.data import DataLoader
+
 from spacetime.simulate import labels_indices, Adjacency, Simulator
 
 class SpaceTime:
     def __init__(self, **kwargs):
         defaults = {'adj':None, 'order':dict(), 'label_dict':dict(), 'data':None}
+        
         if set(kwargs.keys())-set(defaults.keys()):
             raise KeyError("Allowed keys: %s"%list(defaults.keys()))
             
@@ -14,7 +21,6 @@ class SpaceTime:
         self.graph = nx.DiGraph(defaults['adj'])
         self.order = defaults['order']
         self.label_dict = defaults['label_dict']
-        self.data = defaults['data']
         nx.set_node_attributes(self.graph, self.label_dict, name = 'label')
             
     @classmethod
@@ -38,8 +44,12 @@ class SpaceTime:
             adj, order, index_dict, label_dict = Adjacency.dag(nodes=node_dict)
         return cls(adj=adj, order=order, label_dict=label_dict)
     
-    def generate_data(self, **kwargs):
-        self.data = Simulator.sem(self.graph, **kwargs)
+    def load_adjacency(self, adj, node_list = None):
+        adj_sorted, order, index_dict, label_dict = Adjacency.dag(adj, node_list)
+        self.graph = nx.DiGraph(adj_sorted)
+        self.order = order
+        self.label_dict = label_dict
+        nx.set_node_attributes(self.graph, self.label_dict, name = 'label')
         
     def topological_sort(self, node_list=None):
         if node_list is not None:
@@ -79,3 +89,21 @@ class SpaceTime:
         
     def show_adj(self, around=3):
         return np.around(nx.to_numpy_array(self.graph), around)
+    
+    def torch_data(self, data):
+        return nn.Parameter(torch.FloatTensor(data))
+    
+    def torch_loader(self, data, batch_size=1000):
+        feat_train, feat_test = torch.FloatTensor(data), torch.FloatTensor(data)
+
+        train_data = TensorDataset(feat_train, feat_train)
+        test_data = TensorDataset(feat_test, feat_test)
+
+        train_data_loader = DataLoader(train_data, batch_size=batch_size)
+        test_data_loader = DataLoader(test_data, batch_size=len(test_data))
+
+        return train_data_loader, test_data_loader
+
+    def torch_graph(self):
+        adj = self.show_adj(around=10).copy()
+        return nn.Parameter(torch.from_numpy(adj).double())

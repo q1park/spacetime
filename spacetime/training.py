@@ -102,16 +102,12 @@ def train(lambda_A, c_A, optimizer, scheduler, encoder, decoder, train_loader, a
         data = Variable(data).double()
         optimizer.zero_grad()
 
-        enc_x, logits, origin_A, z_gap, z_positive, myA, Wa = encoder(data)  # logits is of size: [num_sims, z_dims]
-        edges = logits
-        dec_x, output = decoder(edges, args.data_variable_size*args.x_dims, origin_A, Wa)
-
-        if torch.sum(output != output):
-            print('nan error\n')
-
-        target = data
-        preds = output
+        enc_x, z_train, origin_A, z_gap, z_positive, myA, Wa = encoder(data)  # logits is of size: [num_sims, z_dims]
+        dec_x, preds = decoder(z_train, origin_A, Wa)
         variance = 0.
+        
+        if torch.sum(preds != preds):
+            print('nan error\n')
 
         # compute h(A)
         if args.ordered_graph:
@@ -120,8 +116,8 @@ def train(lambda_A, c_A, optimizer, scheduler, encoder, decoder, train_loader, a
             h_A = _h_A(origin_A, args.data_variable_size)
     
         # reconstruction accuracy loss
-        loss_elbo = nll_gaussian(preds, target, variance) + kl_gaussian_sem(logits)
-        loss_nll = nll_gaussian(preds, target, variance)
+        loss_elbo = nll_gaussian(preds, data, variance) + kl_gaussian_sem(z_train)
+        loss_nll = nll_gaussian(preds, data, variance)
         
         loss = loss_elbo
         loss += lambda_A*h_A + 0.5*c_A*h_A*h_A + 100.*torch.trace(origin_A*origin_A)

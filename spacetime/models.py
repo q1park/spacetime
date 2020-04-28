@@ -12,7 +12,7 @@ _EPS = 1e-10
 
 class MLPEncoder(nn.Module):
     """MLP encoder module."""
-    def __init__(self, n_in, n_xdims, n_hid, n_out, adj_A, tol = 0.1):
+    def __init__(self, n_xdims, n_hid, n_out, adj_A, tol = 0.1):
         super(MLPEncoder, self).__init__()
 
         self.adj_A = nn.Parameter(Variable(torch.from_numpy(adj_A).double(), requires_grad=True))
@@ -59,7 +59,7 @@ class MLPEncoder(nn.Module):
 class MLPDecoder(nn.Module):
     """MLP decoder module."""
 
-    def __init__(self, n_in_node, n_in_z, n_out, n_hid):
+    def __init__(self, n_in_z, n_out, n_hid):
         super(MLPDecoder, self).__init__()
 
         self.out_fc1 = nn.Linear(n_in_z, n_hid, bias = True)
@@ -81,7 +81,7 @@ class MLPDecoder(nn.Module):
         adj_normalized = torch.inverse(torch.eye(adj.shape[0]).double()-adj.transpose(0,1))
         return adj_normalized
 
-    def forward(self, input_z, n_in_node, origin_A, Wa):
+    def forward(self, input_z, origin_A, Wa):
         #adj_A_new1 = (I-A^T)^(-1)
         adj_A_new1 = self.preprocess_adj_inv(origin_A)
         mat_z = torch.matmul(adj_A_new1, input_z+Wa)-Wa
