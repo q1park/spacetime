@@ -38,31 +38,6 @@ class Adjacency:
             index_dict, label_dict = labels_indices(node_list)
             order = {t:list(map(index_dict.get, xx)) for t, xx in nodes.items()}
             adj_sorted, sorted_nodes = np.zeros(2*[len(node_list)]), node_list
-        
-#         if type(nodes) == list:
-#             node_list = nodes
-#             index_dict, label_dict = labels_indices(node_list)
-#             if adj is None:
-#                 adj_sorted, sorted_nodes = np.zeros(2*[len(node_list)]), node_list
-#                 order = cls.struct(adj_sorted)
-#             else:
-#                 adj_sorted, sorted_nodes = cls.sort(adj, node_list)
-#                 order = cls.struct(adj_sorted)
-#         elif type(nodes) == dict:
-#             node_list = [j for i in nodes.values() for j in i]
-#             index_dict, label_dict = labels_indices(node_list)
-#             if adj is None:
-#                 adj_sorted, sorted_nodes = np.zeros(2*[len(node_list)]), node_list
-#                 order = {t:list(map(index_dict.get, xx)) for t, xx in nodes.items()}
-#             else:
-#                 adj_sorted, sorted_nodes = cls.sort(adj, node_list)
-#                 order = cls.struct(adj_sorted)
-#         else:
-#             if adj is None:
-#                 raise TypeError("node strucure must be list or dict")
-#             else:
-#                 node_list = list(range(adj.shape[0]))
-            
         return adj_sorted, order, index_dict, label_dict
     
     @staticmethod

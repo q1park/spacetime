@@ -43,7 +43,7 @@ class MLPEncoder(nn.Module):
             print('nan error \n')
 
         # to amplify the value of A and accelerate convergence.
-        adj_A1 = torch.sinh(3.*self.adj_A)
+        adj_A1 = torch.sinh(3*self.adj_A)
 
         # adj_Aforz = I-A^T
         adj_Aforz = self.preprocess_adj(adj_A1)
@@ -91,3 +91,5 @@ class MLPDecoder(nn.Module):
         out = self.out_fc3(H3)
 
         return mat_z, out
+    
+    

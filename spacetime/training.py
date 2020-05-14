@@ -11,7 +11,7 @@ from torch.autograd import Variable
 #===================================
 
 # compute constraint h(A) value
-def _h_A(A, m):
+def _h_A_general(A, m):
     x = torch.eye(m).double()+ torch.div(A*A, m)
     expm_A = torch.matrix_power(x, m)
     return torch.trace(expm_A) - m
@@ -28,6 +28,12 @@ def _h_A_ordered(A, node_dict):
         block_row += block_width
         block_col += block_width
     return h_A
+
+def acyclicity(A, args):
+    if args.ordered_graph:
+        return _h_A_ordered(A, args.node_dict)
+    else:
+        return _h_A_general(A, args.data_variable_size)
 
 def stau(w, tau):
     w1 = torch.nn.Threshold(0.,0.)(torch.abs(w)-tau)
@@ -88,6 +94,7 @@ def update_optimizer(optimizer, original_lr, c_A):
 def train(lambda_A, c_A, optimizer, scheduler, encoder, decoder, train_loader, args):
     t = time.time()
     elbo_train = []
+    kl_train = []
     nll_train = []
 
     encoder.train()
@@ -110,19 +117,18 @@ def train(lambda_A, c_A, optimizer, scheduler, encoder, decoder, train_loader, a
             print('nan error\n')
 
         # compute h(A)
-        if args.ordered_graph:
-            h_A = _h_A_ordered(origin_A, args.node_dict)
-        else:
-            h_A = _h_A(origin_A, args.data_variable_size)
+        h_A = acyclicity(origin_A, args)
     
         # reconstruction accuracy loss
-        loss_elbo = nll_gaussian(preds, data, variance) + kl_gaussian_sem(z_train)
+        
+        loss_kl = kl_gaussian_sem(z_train)
         loss_nll = nll_gaussian(preds, data, variance)
+        loss_elbo = loss_kl + loss_nll
         
         loss = loss_elbo
         loss += lambda_A*h_A + 0.5*c_A*h_A*h_A + 100.*torch.trace(origin_A*origin_A)
-        loss += args.tau_A*torch.sum(torch.abs(origin_A))
-
+#         loss += args.tau_A*torch.sum(torch.abs(origin_A))
+        loss += args.tau_A*torch.sum(origin_A*origin_A)
         # other loss terms
         if args.use_A_connect_loss:
             connect_gap = A_connect_loss(origin_A, args.graph_threshold, z_gap)
@@ -140,10 +146,8 @@ def train(lambda_A, c_A, optimizer, scheduler, encoder, decoder, train_loader, a
         if torch.sum(origin_A != origin_A):
             print('nan error\n')
 
-        graph = origin_A.data.clone().numpy()
-        graph[np.abs(graph) < args.graph_threshold] = 0
-
         elbo_train.append(loss_elbo.item())
+        kl_train.append(loss_kl.item())
         nll_train.append(loss_nll.item())
 
-    return np.mean(elbo_train), np.mean(nll_train), graph, origin_A
+    return np.mean(elbo_train), np.mean(kl_train), np.mean(nll_train), origin_A

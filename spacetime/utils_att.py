@@ -1,6 +1,10 @@
 import numpy as np
 from copy import deepcopy
 
+class Parameters:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
 class arguments:
     def __init__(self, node_dict):
         # data parameters 

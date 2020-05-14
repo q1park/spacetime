@@ -87,7 +87,7 @@ class SpaceTime:
         plt.axis('off')
         plt.show()
         
-    def show_adj(self, around=3):
+    def show_adj(self, around=10):
         return np.around(nx.to_numpy_array(self.graph), around)
     
     def torch_data(self, data):
@@ -105,5 +105,5 @@ class SpaceTime:
         return train_data_loader, test_data_loader
 
     def torch_graph(self):
-        adj = self.show_adj(around=10).copy()
+        adj = self.show_adj().copy()
         return nn.Parameter(torch.from_numpy(adj).double())

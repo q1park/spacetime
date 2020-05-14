@@ -1,2 +1,2 @@
 from .spacetime import SpaceTime
-from .IC import InductiveCausation, RobustRegressionTest
+from .constraint import InductiveCausation, RobustRegressionTest
