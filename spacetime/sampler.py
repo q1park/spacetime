@@ -1,5 +1,6 @@
-import numpy as np
 import time
+import numpy as np
+import networkx as nx
 from statsmodels.nonparametric.kernel_density import KDEMultivariate, KDEMultivariateConditional, EstimatorSettings
 
 class NodeData:
@@ -50,7 +51,7 @@ class NodeData:
 
 class GraphSampler:
     def __init__(self, spacetime, node_data):
-        assert len(spacetime.label_dict)==len(node_data.nodes)
+        assert spacetime.adj.shape[0]==len(node_data.nodes)
         
         self.st = spacetime
         self.node_data = node_data
@@ -62,8 +63,10 @@ class GraphSampler:
         self.node_pdfs = {node:dict() for node in self.node_data.nodes}
     
     def _compute_from_kdes(self, htype):
+        G = nx.DiGraph(self.st.adj.numpy())
+        
         for node in self.node_data.nodes:
-            inds = tuple(self.st.graph.predecessors(node))
+            inds = tuple(G.predecessors(node))
 
             if len(inds)==0:
                 nodes, distro = self.kde.compute_joint(node, htype=htype)

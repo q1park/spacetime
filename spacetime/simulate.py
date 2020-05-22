@@ -96,9 +96,9 @@ class Simulator:
             raise KeyError("Allowed keys: %s"%list(defaults.keys()))
         defaults.update(kwargs)
         return cls.simulate_sem(graph, **defaults)
-
+        
     @staticmethod
-    def simulate_random_dag(node_list, degree, graph_type, w_range=(0.5, 2.0), force_positive=False, seed=0):
+    def simulate_random_dag(node_list, degree, graph_type, w_range=(0.5, 2.0), force_positive=False, sort=True, seed=0):
         """Simulate random DAG with some expected degree.
         Args:
             node_list: list containing node labels

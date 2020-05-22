@@ -105,11 +105,10 @@ class ActionOpt:
 
         self.log = {k:[] for k in ('elbo', 'kld', 'nll', 'lr', 'l', 'c', 'h')}
         
-    def show_adj(self, threshold=0.3):
-        graph = self.best_adj.data.clone().numpy()
-        graph[np.abs(graph) < threshold] = 0
-        return graph
-        
+    def show_adj(self, threshold=0.0):
+        clip = nn.Threshold(threshold, 0.0)
+        adj = self.best_adj.detach()
+        return clip(adj)-clip(-adj)
         
     def update_lr(self):
         rate = self.original_lr/(np.log10(self.c)+1e-10)
@@ -184,6 +183,6 @@ def train(model, train_loader, loss):
     loss.end_epoch()
     
 def truth_evaluation(true_adj, optimizer, threshold):
-    _, _, _, shd, _ = count_accuracy(true_adj, optimizer.show_adj(threshold=threshold))
-    err = adjacency_error(true_adj, optimizer.show_adj(threshold=0.0))
+    _,_,_,shd,_ = count_accuracy(true_adj.numpy(), optimizer.show_adj(threshold).numpy())
+    err = adjacency_error(true_adj.numpy(), optimizer.show_adj(0.0).numpy())
     return shd, err
