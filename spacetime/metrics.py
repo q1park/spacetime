@@ -52,7 +52,7 @@ def count_accuracy(G_true, G):
     extra_lower = np.setdiff1d(pred_lower, cond_lower, assume_unique=True)
     missing_lower = np.setdiff1d(cond_lower, pred_lower, assume_unique=True)
     shd = len(extra_lower) + len(missing_lower) + len(reverse)
-    return fdr, tpr, fpr, shd, pred_size
+    return shd, tpr, fpr, fdr, pred_size
 
 def binary_accuracy(output, labels):
     preds = output > 0.5

@@ -1,3 +1,4 @@
+import copy
 import itertools
 import numpy as np
 import networkx as nx
@@ -8,102 +9,68 @@ from torch import nn
 from torch.utils.data.dataset import TensorDataset
 from torch.utils.data import DataLoader
 
-from spacetime.simulate import labels_indices, Adjacency, Simulator
-
 class SpaceTime:
-    def __init__(self, **kwargs):
-        defaults = {'adj':None, 'order':dict(), 'label_dict':dict(), 'data':None}
+    def __init__(self, adj):
+        self.adj = adj
+        self.n_nodes = adj.shape[-1]
         
-        if set(kwargs.keys())-set(defaults.keys()):
-            raise KeyError("Allowed keys: %s"%list(defaults.keys()))
-            
-        defaults.update(kwargs)
-        self.graph = nx.DiGraph(defaults['adj'])
-        self.order = defaults['order']
-        self.label_dict = defaults['label_dict']
-        nx.set_node_attributes(self.graph, self.label_dict, name = 'label')
-            
-    @classmethod
-    def from_adjacency(cls, adj, node_list = None):
-        adj_sorted, order, index_dict, label_dict = Adjacency.dag(adj, node_list)
-        return cls(adj=adj_sorted, order=order, label_dict=label_dict)
-
-    @classmethod
-    def from_spacelike(cls, node_list, simulate = False, **kwargs):
-        if simulate:
-            adj, order, index_dict, label_dict = Simulator.random_dag(node_list, **kwargs)
-        else:
-            adj, order, index_dict, label_dict = Adjacency.dag(nodes=node_list)
-        return cls(adj=adj, order=order, label_dict=label_dict)
-        
-    @classmethod
-    def from_spacetime(cls, node_dict, simulate = False, **kwargs):
-        if simulate:
-            adj, order, index_dict, label_dict = Simulator.ordered_dag(node_dict, **kwargs)
-        else:
-            adj, order, index_dict, label_dict = Adjacency.dag(nodes=node_dict)
-        return cls(adj=adj, order=order, label_dict=label_dict)
+    def _mutilate(self, *nodes):
+        mask = torch.ones(self.adj.shape)
+        for node in nodes:
+            mask[:, node:node+1]*=torch.zeros((self.n_nodes, 1))
+        return mask
     
-    def load_adjacency(self, adj, node_list = None):
-        adj_sorted, order, index_dict, label_dict = Adjacency.dag(adj, node_list)
-        self.graph = nx.DiGraph(adj_sorted)
-        self.order = order
-        self.label_dict = label_dict
-        nx.set_node_attributes(self.graph, self.label_dict, name = 'label')
-        
-    def topological_sort(self, node_list=None):
-        if node_list is not None:
-            if len(node_list)!=self.show_adj().shape[0]:
-                raise ValueError("node list must have length %s"%self.show_adj().shape[0])
-        elif len(nx.get_node_attributes(self.graph, 'label')) == 0:
-            node_list = list(self.graph.nodes)
-        else:
-            node_list = list(nx.get_node_attributes(self.graph, 'label').values())
-        adj, order, index_dict, label_dict = Adjacency.dag(self.show_adj(), node_list)
-        self.graph = nx.DiGraph(adj)
-        self.order = order
-        self.label_dict = label_dict
-        nx.set_node_attributes(self.graph, self.label_dict, name = 'label')
+    def time_scores(self):
+        n_nodes = self.adj.shape[0]
+        I = torch.eye(n_nodes).double()
+        expA = torch.matrix_power(I+(1/n_nodes)*torch.tanh(self.adj)**2, n_nodes)
+        scores = torch.div(1.0, torch.sum(expA, dim=1))-torch.div(1.0, torch.sum(expA, dim=0))
+        return scores
+    
+    def mutilate(self, *nodes):
+        adj = copy.deepcopy(self.adj)
+        return adj*self._mutilate(*nodes)
+    
+    def topk(self, k):
+        n_bottom = int(self.n_nodes**2-k)
+        adj = copy.deepcopy(self.adj).view(-1)
+        adj[torch.topk(torch.abs(adj), n_bottom, largest=False).indices]=0.
+        return adj.view(self.adj.shape)
+    
+    def sort(self):
+        return torch.argsort(self.time_scores(), dim=-1, descending=False)
+    
+    def norm(self):
+        return self.adj/torch.abs(self.adj).max()
+    
+    def threshold(self, threshold):
+        return nn.Threshold(threshold, 0.0)(self.adj)-nn.Threshold(threshold, 0.0)(-self.adj)
     
     def layout(self):
         positions = dict()
-        if len(self.order) == 0:
-            self.topological_sort()
-            
-        for t, step in self.order.items():
-            for x, node in enumerate(step):
-                shift = np.random.uniform(0,0.2) if x%2==0 else 0
-                shiftt = np.random.uniform(0,0.2) if t%2==0 else 0
-                positions[node] = np.array([t+shift, x+shiftt])
+        scores = self.time_scores().tolist()
+        x_min, x_max = min(scores), max(scores)
+        
+        for node, t in enumerate(scores):
+            positions[node] = np.array([t, np.random.uniform(x_min, x_max)])
         return positions
                 
-    def draw_graph(self):
+    def draw_graph(self, labels=None):
+        G = nx.DiGraph(self.adj.numpy())
+        labels = {i:i for i in range(self.adj.shape[0])} if labels is None else labels
         pos = self.layout()
-        node_labels = nx.get_node_attributes(self.graph,'label')
-        edge_labels = nx.get_edge_attributes(self.graph,'causal')
-        nx.draw_networkx(self.graph, with_labels=False, pos=pos, node_size=800, node_color='gray')
-        nx.draw_networkx_labels(self.graph, pos=pos, labels=node_labels)
-        nx.draw_networkx_edge_labels(self.graph, pos=pos,edge_labels=edge_labels)
+        nx.draw_networkx(G, with_labels=False, pos=pos, node_size=800, node_color='gray')
+        nx.draw_networkx_labels(G, pos=pos, labels=labels)
         plt.axis('off')
         plt.show()
         
-    def show_adj(self, around=10):
-        return np.around(nx.to_numpy_array(self.graph), around)
+class Data:
+    def __init__(self, data):
+        self.data = data
     
-    def torch_data(self, data):
-        return nn.Parameter(torch.FloatTensor(data))
-    
-    def torch_loader(self, data, batch_size=1000):
-        feat_train, feat_test = torch.FloatTensor(data), torch.FloatTensor(data)
-
-        train_data = TensorDataset(feat_train, feat_train)
-        test_data = TensorDataset(feat_test, feat_test)
-
+    def loader(self, batch_size):
+        train_data = TensorDataset(torch.Tensor(self.data), torch.Tensor(self.data))
         train_data_loader = DataLoader(train_data, batch_size=batch_size)
-        test_data_loader = DataLoader(test_data, batch_size=len(test_data))
+        test_data_loader = DataLoader(train_data, batch_size=len(train_data))
 
         return train_data_loader, test_data_loader
-
-    def torch_graph(self):
-        adj = self.show_adj().copy()
-        return nn.Parameter(torch.from_numpy(adj).double())
