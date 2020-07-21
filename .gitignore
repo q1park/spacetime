@@ -2,4 +2,6 @@
 __pycache__
 */__pycache__
 
-scratch_*.ipynb
+experiments*.ipynb
+*models
+*results

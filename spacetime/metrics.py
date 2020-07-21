@@ -56,7 +56,7 @@ def count_accuracy(G_true, G):
 
 def binary_accuracy(output, labels):
     preds = output > 0.5
-    correct = preds.type_as(labels).eq(labels).double()
+    correct = preds.type_as(labels).eq(labels)
     correct = correct.sum()
     return correct / len(labels)
 
